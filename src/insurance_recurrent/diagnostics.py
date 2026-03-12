@@ -25,7 +25,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from scipy.stats import gamma as gamma_dist, probplot
+from scipy.stats import gamma as gamma_dist
 
 from .data import RecurrentEventData
 from .frailty import SharedFrailtyModel
@@ -54,7 +54,7 @@ def frailty_qq_data(
     -------
     pd.DataFrame with columns:
         theoretical : float, theoretical quantiles from Gamma(1/theta, 1/theta)
-        empirical : float, empirical frailty quantiles
+        empirical : float, empirical frailty quantiles (sorted ascending)
         policy_id : str, policy identifier at each quantile
     """
     predictions = model.predict_frailty(data)
@@ -62,16 +62,22 @@ def frailty_qq_data(
     pids = [p["policy_id"] for p in predictions]
 
     n = len(frailty_means)
-    ranks = (np.argsort(np.argsort(frailty_means)) + 1) / (n + 1)
+    # Sort empirical values and compute uniform quantile positions
+    sort_idx = np.argsort(frailty_means)
+    sorted_frailty = frailty_means[sort_idx]
+    sorted_pids = [pids[i] for i in sort_idx]
+
+    # Plotting positions: (i+0.5)/n (Blom formula without offset, good for gamma)
+    quantile_positions = (np.arange(1, n + 1) - 0.5) / n
 
     theta = model.theta_
     a = 1.0 / theta
-    theoretical = gamma_dist.ppf(ranks, a=a, scale=theta)
+    theoretical = gamma_dist.ppf(quantile_positions, a=a, scale=theta)
 
     return pd.DataFrame({
         "theoretical": theoretical,
-        "empirical": np.sort(frailty_means),
-        "policy_id": [pids[i] for i in np.argsort(frailty_means)],
+        "empirical": sorted_frailty,
+        "policy_id": sorted_pids,
     })
 
 
@@ -168,6 +174,7 @@ def event_rate_by_frailty_decile(
         pred_df["frailty_mean"],
         q=n_deciles,
         labels=list(range(1, n_deciles + 1)),
+        duplicates="drop",
     ).astype(int)
 
     # Merge with actual data to get observed events and exposure
@@ -178,9 +185,6 @@ def event_rate_by_frailty_decile(
     )
 
     merged = pred_df.merge(event_df, on="policy_id", how="left")
-    merged["predicted_events"] = merged["expected_events"] if "expected_events" in merged.columns else (
-        merged["frailty_mean"] * merged["total_exposure"]
-    )
 
     overall_rate = merged["observed_events"].sum() / (merged["total_exposure"].sum() + 1e-10)
 
@@ -195,7 +199,7 @@ def event_rate_by_frailty_decile(
         .reset_index()
     )
     result["observed_rate"] = result["observed_events"] / (result["total_exposure"] + 1e-10)
-    result["predicted_rate"] = result["frailty_mean_avg"] * overall_rate / 1.0  # normalised
+    result["predicted_rate"] = result["frailty_mean_avg"] * overall_rate
     result["lift"] = result["observed_rate"] / (overall_rate + 1e-10)
 
     return result
