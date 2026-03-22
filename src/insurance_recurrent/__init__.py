@@ -38,7 +38,12 @@ Rondeau et al. (2003): Maximum penalized likelihood estimation in a gamma-frailt
 Bühlmann & Gisler (2005): A Course in Credibility Theory. Springer.
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("insurance-recurrent")
+except PackageNotFoundError:
+    __version__ = "0.0.0"  # not installed
 __author__ = "Burning Cost"
 
 from .data import RecurrentEventData
