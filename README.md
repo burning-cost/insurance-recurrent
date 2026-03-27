@@ -1,3 +1,5 @@
+⚠️ **This package has been merged into [`insurance-survival`](https://github.com/burning-cost/insurance-survival).** This repository is archived. Install `insurance-survival` instead.
+
 # insurance-recurrent
 
 Shared frailty models for within-policyholder claim recurrence in insurance pricing.
